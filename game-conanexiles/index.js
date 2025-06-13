@@ -4,6 +4,7 @@ const { fs, selectors, util } = require('vortex-api');
 
 const GAME_ID = 'conanexiles';
 const STEAMAPP_ID = 440900;
+const EPICAPP_ID = '';
 const STOP_PATTERNS = ['[^/]*\\.pak$'];
 
 function toWordExp(input) {
@@ -11,7 +12,7 @@ function toWordExp(input) {
 }
 
 function queryPath() {
-  return util.GameStoreHelper.findByAppId([STEAMAPP_ID.toString()])
+  return util.GameStoreHelper.findByAppId([STEAMAPP_ID.toString(), EPICAPP_ID])
     .then(game => game.gamePath);
 }
 
@@ -50,6 +51,19 @@ async function writeLoadOrder(api, order) {
   }
 }
 
+async function requiresLauncher(gamePath, store) {
+
+  const epicSettings = {
+    launcher: 'epic',
+    addInfo: {
+      appId: EPIC_ID,
+    }
+  };
+
+  if (store === 'epic') return Promise.resolve(epicSettings);
+  return Promise.resolve(undefined);
+}
+
 function main(context) {
   context.registerGame({
     id: GAME_ID,
@@ -58,14 +72,26 @@ function main(context) {
     mergeMods: true,
     queryPath,
     queryModPath,
-    executable: () => path.join('ConanSandbox', 'Binaries', 'Win64', 'ConanSandbox.exe'),
-    requiredFiles: ['ConanSandbox.exe'],
+    requiresLauncher: requiresLauncher,
+    executable: (discoveredPath) => {
+      try {
+        const epicPath = path.join('ConanSandboxEgs.exe');
+        fs.statSync(path.join(discoveredPath, epicPath));
+        return epicPath;
+      }
+      catch (err) {
+        return path.join('ConanSandbox.exe');
+      }
+  },
+    requiredFiles: ['ConanSandbox'],
     setup,
     environment: {
       SteamAPPId: STEAMAPP_ID.toString(),
+      EpicAPPId: EPICAPP_ID,
     },
     details: {
-      steamAppId: STEAMAPP_ID,
+      steamAppId: +STEAMAPP_ID,
+      epicAppId: EPICAPP_ID,
       stopPattern: STOP_PATTERNS.map(toWordExp),
       hashFiles: [
         'ConanSandbox.exe',
@@ -93,4 +119,3 @@ function main(context) {
 module.exports = {
   default: main
 };
-
